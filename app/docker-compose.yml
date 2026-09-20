@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bloom
+      POSTGRES_USER: bloom
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bloom -d bloom"]
+      interval: 10s
+      retries: 5
+    # not published to the host: only the app can reach it
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://bloom:${DB_PASSWORD}@db:5432/bloom
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      APP_URL: https://${DOMAIN:?set DOMAIN in .env}
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-bloom-india.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-ankit.kumar@bloom-india.com}
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?set SMTP_USER in .env}
+      SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in .env}
+      MAIL_FROM: ${MAIL_FROM:-Bloom Timesheet <no-reply@bloom-india.com>}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  caddy_data:

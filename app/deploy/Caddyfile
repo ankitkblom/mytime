@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) for {$DOMAIN}; DNS A record must point at this server.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:4000
+}
